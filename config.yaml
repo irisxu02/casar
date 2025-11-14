@@ -1,0 +1,20 @@
+data:
+  path: '/path/to/h2o/dataset'
+  batch_size: 32
+
+model:
+  num_frames: 32
+  num_classes: 36
+
+training:
+  optimizer_f:
+    lr: 0.0001
+  optimizer_g:
+    lr: 0.00001
+  
+  scheduler_f:
+    step_size: 20
+    gamma: 0.7
+  scheduler_g:
+    step_size: 200
+    gamma: 0.7
