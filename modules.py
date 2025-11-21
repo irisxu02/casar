@@ -59,9 +59,11 @@ class H2OContactDataset(Dataset):
         split: str,
         eta_c: float = 0.02,
         eta_d: float = 0.2,
+        use_cache: bool = True,
     ):
         self._eta_c_sq = eta_c**2
         self._eta_d_sq = eta_d**2
+        self._use_cache = use_cache
 
         loaded_paths = set()
         self._elements = []
@@ -91,10 +93,13 @@ class H2OContactDataset(Dataset):
                 for frame in range(start_frame, end_frame + 1):
                     self._elements.append((tokens[1], frame))
 
+        if self._use_cache:
+            self._cache: list[None | tuple] = [None for _ in self._elements]
+
     def __len__(self):
         return len(self._elements)
 
-    def __getitem__(self, idx):
+    def _get_item(self, idx):
         rel_path, frame = self._elements[idx]
         path = os.path.join(self._base_dir, rel_path)
 
@@ -125,10 +130,20 @@ class H2OContactDataset(Dataset):
         qi = np.concatenate((ci, di))
         return torch.from_numpy(pi), torch.from_numpy(qi)
 
+    def __getitem__(self, idx):
+        if self._use_cache:
+            if self._cache[idx] == None:
+                self._cache[idx] = self._get_item(idx)
+            return self._cache[idx]
+        return self._get_item(idx)
+
 
 class H2OSkeletonDataset(Dataset):
-    def __init__(self, dataset_path: str, split: str, N: int = 32):
+    def __init__(
+        self, dataset_path: str, split: str, N: int = 32, use_cache: bool = True
+    ):
         self._N = N
+        self._use_cache = use_cache
 
         self._elements = []
 
@@ -153,10 +168,13 @@ class H2OSkeletonDataset(Dataset):
 
                 self._elements.append((tokens[1], action_label, start_act, end_act))
 
+        if self._use_cache:
+            self._cache: list[None | tuple] = [None for _ in self._elements]
+
     def __len__(self):
         return len(self._elements)
 
-    def __getitem__(self, idx):
+    def _get_item(self, idx):
         rel_path, action_label, start_act, end_act = self._elements[idx]
         path = os.path.join(self._base_dir, rel_path)
 
@@ -175,6 +193,13 @@ class H2OSkeletonDataset(Dataset):
         if action_label != -1:
             yi[action_label - 1] = 1
         return torch.from_numpy(xi), yi
+
+    def __getitem__(self, idx):
+        if self._use_cache:
+            if self._cache[idx] == None:
+                self._cache[idx] = self._get_item(idx)
+            return self._cache[idx]
+        return self._get_item(idx)
 
 
 class MLP(nn.Module):
