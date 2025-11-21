@@ -134,7 +134,6 @@ class H2OSkeletonDataset(Dataset):
         return len(self._elements)
 
     def __getitem__(self, idx):
-        # TODO: action label
         rel_path, action_label, start_act, end_act = self._elements[idx]
         path = os.path.join(self._base_dir, rel_path)
 
@@ -148,7 +147,11 @@ class H2OSkeletonDataset(Dataset):
             xjs.append(xj)
 
         xi = np.stack(xjs)
-        return torch.from_numpy(xi), None
+
+        yi = torch.zeros(32)
+        if action_label != -1:
+            yi[action_label - 1] = 1
+        return torch.from_numpy(xi), yi
 
 
 class MLP(nn.Module):
