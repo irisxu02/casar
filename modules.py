@@ -60,8 +60,8 @@ class H2OContactDataset(Dataset):
         eta_c: float = 0.02,
         eta_d: float = 0.2,
     ):
-        self._eta_c = eta_c
-        self._eta_d = eta_d
+        self._eta_c_sq = eta_c**2
+        self._eta_d_sq = eta_d**2
 
         loaded_paths = set()
         self._elements = []
@@ -95,13 +95,35 @@ class H2OContactDataset(Dataset):
         return len(self._elements)
 
     def __getitem__(self, idx):
-        # TODO: compute contact/distant points
         rel_path, frame = self._elements[idx]
         path = os.path.join(self._base_dir, rel_path)
 
         hand, obj, label = load_frame(path, frame)
         pi = np.concatenate((hand.flatten(), obj.flatten(), label))
-        return torch.from_numpy(pi), None
+
+        # Compute contact and distant points
+        is_contact = []
+        is_distant = []
+        for h in range(42):
+            if h < 21:
+                hand_points = hand[:, h, 0]
+            else:
+                hand_points = hand[:, h - 21, 1]
+
+            min_dist_sq = np.inf
+            for o in range(21):
+                obj_points = obj[:, o]
+
+                dist_sq = np.sum((hand_points - obj_points) ** 2)
+                min_dist_sq = min(min_dist_sq, dist_sq)
+
+            is_contact.append(min_dist_sq <= self._eta_c_sq)
+            is_distant.append(min_dist_sq >= self._eta_d_sq)
+
+        ci = np.array(is_contact).astype(int)
+        di = np.array(is_distant).astype(int)
+        qi = np.concatenate((ci, di))
+        return torch.from_numpy(pi), torch.from_numpy(qi)
 
 
 class H2OSkeletonDataset(Dataset):
@@ -109,6 +131,7 @@ class H2OSkeletonDataset(Dataset):
         self._N = N
 
         self._elements = []
+
         self._base_dir = os.path.abspath(dataset_path)
         index_file = os.path.join(self._base_dir, split_index_mapping[split])
 
