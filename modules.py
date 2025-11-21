@@ -1,12 +1,10 @@
+import os
+
+import numpy as np
+from tqdm import tqdm
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
-import numpy as np
-import os
-import pickle
-from tqdm import tqdm
-import json
+from torch.utils.data import Dataset
 
 
 def load_frame(path: str, frame: int):
