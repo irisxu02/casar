@@ -287,3 +287,20 @@ class CaSAR(nn.Module):
         action_logits = self.action_recognition_module(skeleton_seq, contact_map)
 
         return contact_map, action_logits
+
+
+epsilon = 1e-8
+
+
+def focal_loss(qi, qi_h, alpha=0.5, gamma=4):
+    """
+    Implementation of focal loss defined in equation (3)
+    """
+    # Term 1: -alpha * qi * (1 - qi_hat)^gamma * log(qi_hat)
+    t1 = alpha * qi * torch.pow((1 - qi_h), gamma) * torch.log(qi_h + epsilon)
+
+    # Term 2: -(1 - alpha) * (1 - qi) * (qi_hat)^gamma * log(1 - qi_hat)
+    t2 = (1 - alpha) * (1 - qi) * torch.pow(qi_h, gamma) * torch.log(1 - qi_h + epsilon)
+
+    loss = t1 + t2
+    return -loss.mean()
