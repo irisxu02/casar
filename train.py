@@ -96,17 +96,17 @@ def evaluate(model, dataloader, device):
 
 
 def main():
-    # TODO: implement main training loop
+    config_path = "config.yaml"
+    hyperparameters = load_hyperparameters(config_path)
 
-    # TODO: could load hyperparams from config
-    # config_path = 'config.yaml'
-    # hyperparameters = load_hyperparameters(config_path)
+    print(hyperparameters)
 
-    DATA_PATH = "h2o"
-    BATCH_SIZE = 64  # not specified in paper, so may need to adjust this
-    NUM_FRAMES = 32
-    NUM_CLASSES = 36
-    NUM_WORKERS = 8
+    DATA_PATH = hyperparameters["data"]["path"]
+    BATCH_SIZE = hyperparameters["data"]["batch_size"]
+    NUM_WORKERS = hyperparameters["data"]["num_workers"]
+
+    NUM_FRAMES = hyperparameters["model"]["num_frames"]
+    NUM_CLASSES = hyperparameters["model"]["num_classes"]
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -143,11 +143,23 @@ def main():
     f = model.contact_aware_module
     g = model.action_recognition_module
 
-    optimizer_f = optim.Adam(f.parameters(), lr=1e-4)
-    optimizer_g = optim.Adam(g.parameters(), lr=1e-5)
+    optimizer_f = optim.Adam(
+        f.parameters(), lr=hyperparameters["training"]["optimizer_f"]["lr"]
+    )
+    optimizer_g = optim.Adam(
+        g.parameters(), lr=hyperparameters["training"]["optimizer_g"]["lr"]
+    )
 
-    scheduler_f = optim.lr_scheduler.StepLR(optimizer_f, step_size=20, gamma=0.7)
-    scheduler_g = optim.lr_scheduler.StepLR(optimizer_g, step_size=200, gamma=0.7)
+    scheduler_f = optim.lr_scheduler.StepLR(
+        optimizer_f,
+        step_size=hyperparameters["training"]["scheduler_f"]["step_size"],
+        gamma=hyperparameters["training"]["scheduler_f"]["gamma"],
+    )
+    scheduler_g = optim.lr_scheduler.StepLR(
+        optimizer_g,
+        step_size=hyperparameters["training"]["scheduler_g"]["step_size"],
+        gamma=hyperparameters["training"]["scheduler_g"]["gamma"],
+    )
 
     for param in g.parameters():
         param.requires_grad = False

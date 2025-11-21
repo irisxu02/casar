@@ -1,6 +1,7 @@
 data:
-  path: '/path/to/h2o/dataset'
+  path: "h2o"
   batch_size: 32
+  num_workers: 4
 
 model:
   num_frames: 32
