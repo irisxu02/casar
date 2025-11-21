@@ -9,6 +9,41 @@ from tqdm import tqdm
 import json
 
 
+def load_frame(path: str, frame: int):
+    """
+    Loads a hand, object, and label for a single frame
+
+    Args:
+        path    : Path to h2o dataset video segment
+        frame   : Frame number to load
+
+    Returns:
+        hand    (3 x 21 x 2) numpy array of (x, y, z) points corresponding
+                    to 21 joints on left and right hand
+        obj     (3 x 21) numpy array of (x, y, z) points corresponding
+                    to 21 points of object bounding box
+        label   8-element one-hot vector denoting object label
+    """
+    hand_pose = np.loadtxt(os.path.join(path, f"cam4/hand_pose/{frame:06d}.txt"))
+    obj_pose = np.loadtxt(os.path.join(path, f"cam4/obj_pose/{frame:06d}.txt"))
+
+    # Ignore first element of each hand, actual points start at second element
+    left = hand_pose[1:64].reshape((3, 21), order="F")
+    right = hand_pose[65:128].reshape((3, 21), order="F")
+
+    # Combine into 3 x 21 x 2 matrix
+    hand = np.stack((left, right), axis=2)
+
+    # First element is object label, actual points start at second element
+    obj = obj_pose[1:].reshape((3, 21), order="F")
+
+    # First element is object label
+    label = np.zeros(8)
+    label[obj_pose[0].astype(int) - 1] = 1
+
+    return hand, obj, label
+
+
 class H2ODataset(Dataset):
     """
     TODO: implement dataset loader
