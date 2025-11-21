@@ -59,17 +59,16 @@ class H2OContactDataset(Dataset):
         split: str,
         eta_c: float = 0.02,
         eta_d: float = 0.2,
-        use_cache: bool = True,
     ):
         self._eta_c_sq = eta_c**2
         self._eta_d_sq = eta_d**2
-        self._use_cache = use_cache
 
         loaded_paths = set()
-        self._elements = []
+        elements = []
+        self._data = []
 
-        self._base_dir = os.path.abspath(dataset_path)
-        index_file = os.path.join(self._base_dir, split_index_mapping[split])
+        base_dir = os.path.abspath(dataset_path)
+        index_file = os.path.join(base_dir, split_index_mapping[split])
 
         with open(index_file, "r") as file:
             # Skip first line (the header)
@@ -91,18 +90,13 @@ class H2OContactDataset(Dataset):
                     end_frame = int(tokens[6])
 
                 for frame in range(start_frame, end_frame + 1):
-                    self._elements.append((tokens[1], frame))
+                    elements.append((tokens[1], frame))
 
-        if self._use_cache:
-            self._cache: list[None | tuple] = [None for _ in self._elements]
+        for rel_path, frame in tqdm(elements):
+            path = os.path.join(base_dir, rel_path)
+            self._data.append(self._get_item(path, frame))
 
-    def __len__(self):
-        return len(self._elements)
-
-    def _get_item(self, idx):
-        rel_path, frame = self._elements[idx]
-        path = os.path.join(self._base_dir, rel_path)
-
+    def _get_item(self, path: str, frame: int):
         hand, obj, label = load_frame(path, frame)
         pi = np.concatenate((hand.flatten(), obj.flatten(), label))
 
@@ -130,12 +124,11 @@ class H2OContactDataset(Dataset):
         qi = np.concatenate((ci, di))
         return torch.from_numpy(pi), torch.from_numpy(qi)
 
+    def __len__(self):
+        return len(self._data)
+
     def __getitem__(self, idx):
-        if self._use_cache:
-            if self._cache[idx] == None:
-                self._cache[idx] = self._get_item(idx)
-            return self._cache[idx]
-        return self._get_item(idx)
+        return self._data[idx]
 
 
 class H2OSkeletonDataset(Dataset):
@@ -145,10 +138,11 @@ class H2OSkeletonDataset(Dataset):
         self._N = N
         self._use_cache = use_cache
 
-        self._elements = []
+        elements = []
+        self._data = []
 
-        self._base_dir = os.path.abspath(dataset_path)
-        index_file = os.path.join(self._base_dir, split_index_mapping[split])
+        base_dir = os.path.abspath(dataset_path)
+        index_file = os.path.join(base_dir, split_index_mapping[split])
 
         with open(index_file, "r") as file:
             # Skip first line (the header)
@@ -156,6 +150,7 @@ class H2OSkeletonDataset(Dataset):
             for line in file:
                 tokens = line.split(" ")
 
+                rel_path = tokens
                 if split == "test":
                     # Test dataset doesn't have action_labels column
                     action_label = -1
@@ -166,18 +161,13 @@ class H2OSkeletonDataset(Dataset):
                     start_act = int(tokens[3])
                     end_act = int(tokens[4])
 
-                self._elements.append((tokens[1], action_label, start_act, end_act))
+                elements.append((tokens[1], action_label, start_act, end_act))
 
-        if self._use_cache:
-            self._cache: list[None | tuple] = [None for _ in self._elements]
+        for rel_path, action_label, start_act, end_act in tqdm(elements):
+            path = os.path.join(base_dir, rel_path)
+            self._data.append(self._get_item(path, action_label, start_act, end_act))
 
-    def __len__(self):
-        return len(self._elements)
-
-    def _get_item(self, idx):
-        rel_path, action_label, start_act, end_act = self._elements[idx]
-        path = os.path.join(self._base_dir, rel_path)
-
+    def _get_item(self, path: str, action_label: int, start_act: int, end_act: int):
         # Sample N frames from action sequence
         # Rounding will handle repeat strategy
         frames = np.round(np.linspace(start_act, end_act, self._N)).astype(np.int32)
@@ -194,12 +184,11 @@ class H2OSkeletonDataset(Dataset):
             yi[action_label - 1] = 1
         return torch.from_numpy(xi), yi
 
+    def __len__(self):
+        return len(self._data)
+
     def __getitem__(self, idx):
-        if self._use_cache:
-            if self._cache[idx] == None:
-                self._cache[idx] = self._get_item(idx)
-            return self._cache[idx]
-        return self._get_item(idx)
+        return self._data[idx]
 
 
 class MLP(nn.Module):
@@ -292,7 +281,7 @@ class CaSAR(nn.Module):
 epsilon = 1e-8
 
 
-def focal_loss(qi, qi_h, alpha=0.5, gamma=4):
+def focal_loss(qi_h, qi, alpha=0.5, gamma=4):
     """
     Implementation of focal loss defined in equation (3)
     """
