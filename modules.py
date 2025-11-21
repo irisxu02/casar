@@ -189,7 +189,7 @@ class H2OSkeletonDataset(Dataset):
 
         xi = np.stack(xjs)
 
-        yi = torch.zeros(32)
+        yi = torch.zeros(36)
         if action_label != -1:
             yi[action_label - 1] = 1
         return torch.from_numpy(xi), yi
